@@ -1,0 +1,159 @@
+---
+title: "Statistical Inference Course Project"
+author: "Danny Beery"
+date: "2022-09-30"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Description
+The first part of this report will descriptively and graphically elucidate the differences between a distribution of a large collection of exponential variables (40000) and a distribution of 1000 averages of 40 exponential variables. The second part of this report will evaluate whether toothlength is affected by supplementation (vitamin C vs orange juice) or dosage (.5, 1, or 2 mg/day).
+
+```{r packages, message = FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+```
+
+## Simulation of the averages of 1000 sets of 40 exponential variables (lambda = .2):
+```{r simulation}
+#This simulation creates a vector 'output" with the averages of 
+#1000 sets of 40 exponential variables with lambda = .2
+set.seed(15)
+output_mean <- vector("numeric", length(1:1000))
+for (i in 1:1000) { 
+output_mean[[i]] <- mean(rexp(40,.2))
+}
+
+set.seed(15)
+output_sd <- vector("numeric", length(1:1000))
+for (i in 1:1000) { 
+  output_sd[[i]] <- sd(rexp(40,.2))
+}
+set.seed(15)
+output_var <- vector("numeric", length(1:1000))
+for (i in 1:1000) { 
+  output_var[[i]] <- var(rexp(40,.2))
+}
+```
+
+## Summary statistics for 1000 averages of 40 exponential variables (lambda = .2):
+```{r summary statistics, output}
+sample_mean <- mean(output_mean)
+sample_sd <- mean(output_sd)
+sample_var <- mean(output_var)
+
+sample_mean
+sample_sd
+sample_var
+```
+
+
+Notice that the sample mean, `r sample_mean`, is near the theoretical mean (1/lambda), 5.
+
+Likewise, the sample variance, `r sample_var` is near the theorectical variance (1/lambda^2), 25.
+
+Now let's visual our simulated sample means: 
+
+```{r output graphs}
+sim <- as_tibble(output_mean)
+norm_curve <- rnorm(1000, sample_mean, sd(output_mean))
+sim$norm <- norm_curve
+
+sim %>%
+  ggplot() +
+  geom_histogram(aes(x = value, y = ..density..)) +
+  geom_density(aes(x=norm), col = "blue", lwd = 1) +
+  labs(
+    x = "Mean",
+    title = "Distribution of 1000 sample means",
+    subtitle = "(Samples of 40 exponentials, lambda = .2)"
+  ) 
+```
+
+As you can see, the sample means follow a normal distribution (Central Limit Theorem). The blue line shows a density curve of 1000 normal variables with an equal mean and sd to our simulated set of sample means. 
+
+
+Now let's conceptualize the difference between the mean of a large sample of exponentials and a sample of means of exponentials: 
+
+## Simulation of 40000 exponentials (lambda = .2):
+```{r simulation, mean single sample}
+#Sample distribution of 40000 exponential with lambda = .2
+set.seed(12)
+output2 <- rexp(40000, .2)
+head(output2)
+```
+
+## Summary statistics for distribution of 40000 exponentials (lambda = .2): 
+```{r summary statistics, output2}
+mean(output2)
+sd(output2)
+var(output2)
+```
+
+Notice that the means of 40000 exponentials and the mean of the averages of 1000 sets of 40 exponentials are similar but the standard deviation (and variance) of the single sample (40000 exponentials) is quite larger.
+
+To show the variability between the two distributions are different, let's take a look the following graphs:
+
+```{r comparison graphs}
+a <- as_tibble(output_mean) %>%
+  ggplot() +
+  geom_histogram(aes(x = value, y = ..density..)) +
+  scale_y_continuous(limits = c(0,.6)) +
+  labs(
+    x = "Value",
+    title = "Distribution of 1000 sample means",
+    subtitle = "(Samples of 40 exponentials, lambda = .2)"
+  ) 
+b <- as_tibble(output2) %>%
+  ggplot() +
+  geom_histogram(aes(x = value, y = ..density..)) +
+  scale_y_continuous(limits = c(0,.6)) +
+  labs(
+    x = "Value",
+    title = "Distribution of 10000 exponentials",
+    subtitle = "(lambda = .2)"
+  ) 
+ggarrange(a,b, ncol = 1, nrow = 2) 
+```
+
+As you can see, the variability of the single large sample is greater than the variability of the distribution of sample means. Notice that the distribution on the bottom is exponentially distributed rather than normally distributed. 
+
+Now let's take a look at the 'ToothGrowth' dataset:
+
+```{r toothgrowth}
+TG <- ToothGrowth
+str(TG)
+```
+
+This dataset contains 60 observations on 3 variables - Tooth length, supplement type (orange juice of vitamin C), and dose (mg/day). 
+
+```{r categorical variables}
+#Tables of categorical predictors
+table(TG$dose)
+table(TG$supp)
+```
+
+Let's take a look at the effect of supplement type and dose on tooth length by using a linear regression model. 
+
+```{r regression}
+y <- lm(data = TG, len ~ as.factor(dose) + supp + factor(dose) * supp) 
+summary(y)
+confint(y)
+```
+
+As you can see by the output, the higher dosages increase tooth length in a dose-dependent manner. Additionally, we see that guinea pigs given orange juice had longer teeth than guinea pigs given vitamin C. There also appears to be an interaction between supplement and dosage at 2 mg/day. 
+
+Let's assess whether our model is a good fit to data:
+```{r TG plot}
+par(mfrow = c(2,2))
+plot(y)
+```
+
+It should be noted that this model assumes that the relationship between tooth length and the independent variables is linear. Furthermore, the model assumes that data on all variables that significantly influence tooth length were collected. 
+
